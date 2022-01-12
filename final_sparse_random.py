@@ -4,6 +4,7 @@ from quop_mpi import Ansatz, param
 from quop_mpi.propagator import diagonal, sparse
 import networkx as nx
 import numpy as np
+from scipy import sparse as sp
 
 n_qubits = 5
 system_size = 2 ** n_qubits
@@ -14,12 +15,16 @@ def quality_distribution(n_qubits):
     return np.random.normal(loc=100, scale=20, size=2 ** n_qubits)
 
 
-def random_mixer(n_qubits):
-    # return a sparse adjacency matrix
-    # the matrix needs to be in the 'SciPy' CSR format
-    # nx.to_scipy_sparse_matrix(G, format = 'csr'
-    G = nx.fast_gnp_random_graph(2 ** n_qubits, 0.3, directed=False)
-    return [nx.to_scipy_sparse_matrix(G, format="csr")]
+def random_mixer(system_size, density):
+    n_edges = int(np.ceil(system_size * density))
+    print(f'Creating random sparse mixer with {n_edges} edges...', flush = True)
+    rows = np.random.choice(n_edges, size = n_edges, replace = True)
+    columns = np.random.choice(n_edges, size = n_edges, replace = True)
+    values = np.ones(n_edges)
+    adjacency_matrix = sp.coo_matrix((values, (rows, columns)), shape = (system_size, system_size))
+    adjacency_matrix = adjacency_matrix.tocsr()
+    print('...done', flush = True)
+    return adjacency_matrix 
 
 
 UQ = diagonal.unitary(
@@ -29,7 +34,7 @@ UQ = diagonal.unitary(
 )
 UW = sparse.unitary(
     sparse.operator.serial,
-    operator_kwargs={"function": random_mixer, "args": [n_qubits]},
+    operator_kwargs={"function": random_mixer, "args": [system_size, 0.05]},
     parameter_function=param.rand.uniform,
 )
 alg = Ansatz(system_size)
@@ -37,5 +42,5 @@ alg.set_unitaries([UQ, UW])
 alg.set_observables(0)
 alg.set_log("sparse_random", "example", action="a")
 alg.benchmark(
-    range(1, 9), 3, param_persist=True, filename="sparse_random", save_action="a"
+    range(1, 2), 1, param_persist=True, filename="sparse_random", save_action="a"
 )
