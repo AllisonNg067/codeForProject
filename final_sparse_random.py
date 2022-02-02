@@ -6,22 +6,26 @@ import networkx as nx
 import numpy as np
 from scipy import sparse as sp
 
-n_qubits = 5
+n_qubits = 16
 system_size = 2 ** n_qubits
 np.random.seed(1)
 
 def quality_distribution(n_qubits):
     # return a numpy array of size "system_size"
-    return np.random.normal(loc=100, scale=20, size=2 ** n_qubits)
+    vector = np.random.normal(loc=100, scale=20, size=2 ** n_qubits)
+    vector = -vector / np.max(vector)
+    return vector
 
 
 def random_mixer(system_size, density):
-    n_edges = int(np.ceil(system_size * density))
+    n_edges = int(np.ceil((system_size**2) * density))
     print(f'Creating random sparse mixer with {n_edges} edges...', flush = True)
-    rows = np.random.choice(n_edges, size = n_edges, replace = True)
-    columns = np.random.choice(n_edges, size = n_edges, replace = True)
-    values = np.ones(n_edges)
-    adjacency_matrix = sp.coo_matrix((values, (rows, columns)), shape = (system_size, system_size))
+    rows = np.random.choice(system_size - 1, size = n_edges, replace = True)
+    columns = np.random.choice(system_size - 1, size = n_edges, replace = True)
+    new_rows = np.append(rows, columns)
+    new_columns = np.append(columns, rows)
+    values = np.ones(n_edges*2)
+    adjacency_matrix = sp.coo_matrix((values, (new_rows, new_columns)), shape = (system_size, system_size))
     adjacency_matrix = adjacency_matrix.tocsr()
     print('...done', flush = True)
     return adjacency_matrix 
@@ -34,7 +38,7 @@ UQ = diagonal.unitary(
 )
 UW = sparse.unitary(
     sparse.operator.serial,
-    operator_kwargs={"function": random_mixer, "args": [system_size, 0.05]},
+    operator_kwargs={"function": random_mixer, "args": [system_size, (np.log(system_size))/system_size]},
     parameter_function=param.rand.uniform,
 )
 alg = Ansatz(system_size)
